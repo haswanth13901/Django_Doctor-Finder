@@ -1,0 +1,210 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+import { getAccessToken, logout } from "@/utils/auth";
+
+type Doctor = {
+  practitioner_id: string;
+  first_name: string;
+  last_name: string;
+  specialization: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+};
+
+const ITEMS_PER_PAGE = 6;
+
+export default function HomePage() {
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [search, setSearch] = useState("");
+  const [specializationFilter, setSpecializationFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [zipFilter, setZipFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const router = useRouter();
+
+  const fetchDoctors = async (page = 1) => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setError("No token found. Please login again.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append("page", page.toString());
+
+      if (specializationFilter) queryParams.append("specialization", specializationFilter);
+      if (cityFilter) queryParams.append("city", cityFilter);
+      if (stateFilter) queryParams.append("state", stateFilter);
+      if (zipFilter) queryParams.append("zip_code", zipFilter);
+
+      const response = await axios.get(
+        `http://127.0.0.1:8000/api/doctors/filter/?${queryParams.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      let result: Doctor[] = response.data.results;
+
+      if (search) {
+        result = result.filter((doc) =>
+          `${doc.first_name} ${doc.last_name}`.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+
+      result.sort((a, b) => {
+        const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
+        return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      });
+
+      setDoctors(result);
+      setTotalPages(Math.ceil(response.data.count / 10));
+      setCurrentPage(page);
+    } catch (err: any) {
+      setError("Failed to load doctors.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctors(1);
+  }, []);
+
+  useEffect(() => {
+    fetchDoctors(1);
+  }, [specializationFilter, cityFilter, stateFilter, zipFilter]);
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-white">Doctor List</h1>
+        <button
+          onClick={handleLogout}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          Logout
+        </button>
+      </div>
+
+      {error && <p className="text-red-600 mb-4 font-semibold">{error}</p>}
+
+      {!error && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <input
+              type="text"
+              placeholder="Search name"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <input
+              type="text"
+              placeholder="Specialization"
+              value={specializationFilter}
+              onChange={(e) => setSpecializationFilter(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <select
+              className="border p-2 rounded"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="asc">Sort A–Z</option>
+              <option value="desc">Sort Z–A</option>
+            </select>
+            <input
+              type="text"
+              placeholder="City"
+              value={cityFilter}
+              onChange={(e) => setCityFilter(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <input
+              type="text"
+              placeholder="State"
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <input
+              type="text"
+              placeholder="Zip Code"
+              value={zipFilter}
+              onChange={(e) => setZipFilter(e.target.value)}
+              className="border p-2 rounded"
+            />
+          </div>
+
+          {loading ? (
+            <p className="text-white">Loading...</p>
+          ) : doctors.length === 0 ? (
+            <p className="text-white">No doctors found.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {doctors.map((doc) => (
+                  <div
+                    key={doc.practitioner_id}
+                    className="p-4 border rounded shadow bg-white hover:bg-gray-100 cursor-pointer"
+                    onClick={() => router.push(`/pages/doctor/${doc.practitioner_id}`)}
+                  >
+                    <h2 className="text-xl font-semibold">
+                      {doc.first_name} {doc.last_name}
+                    </h2>
+                    <p>{doc.specialization}</p>
+                    <p className="text-sm text-gray-500">
+                      {doc.city}, {doc.state} {doc.zip_code}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-center mt-6 gap-4">
+                <button
+                  onClick={() => fetchDoctors(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-white font-semibold pt-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => fetchDoctors(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

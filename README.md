@@ -137,13 +137,6 @@ const doctorsResponse = await axios.get('http://127.0.0.1:8000/api/doctors/', {
 });
 ```
 
-## Changes Made
-
-- Cleaned `requirements.txt` to contain only the backend dependencies actually used by this Django project.
-- Removed unused packages including `fhir-core`, `fhirclient`, `geopy`, `requests`, `pydantic`, and related transitive dependencies.
-- Verified backend imports and Django settings before finalizing the dependency list.
-- Confirmed the effective backend package set includes `Django==5.2.2`, `djangorestframework==3.16.0`, `celery==5.5.3`, `redis==6.2.0`, `psycopg2==2.9.10`, `pandas==2.2.3`, and `fhir.resources==8.0.0`.
-
 ## Roadmap
 
 - Add support for environment configuration via `.env` files.
